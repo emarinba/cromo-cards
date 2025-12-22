@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestor de Cromos de Fútbol</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-    <!-- LOGIN SCREEN -->
+    <!-- LOGIN/REGISTER SCREEN -->
     <section id="loginScreen" class="login-screen active">
         <div class="login-container">
             <div class="login-header">
@@ -16,18 +15,51 @@
                 <h1>Gestor de Cromos</h1>
                 <p>Organiza tu colección de cromos de fútbol</p>
             </div>
-            <div id="g_id_onload"
-                 data-client_id="TU_CLIENT_ID.apps.googleusercontent.com"
-                 data-callback="handleCredentialResponse"
-                 data-auto_prompt="false">
-            </div>
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-size="large"
-                 data-theme="filled_green"
-                 data-text="signin_with"
-                 data-shape="rectangular"
-                 data-logo_alignment="left">
+            
+            <!-- LOGIN FORM -->
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" required placeholder="tu@email.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Contraseña</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    Iniciar Sesión 🚀
+                </button>
+            </form>
+            
+            <!-- REGISTER FORM -->
+            <form id="registerForm" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="registerName">Nombre</label>
+                    <input type="text" id="registerName" required placeholder="Tu nombre" autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" required placeholder="tu@email.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Contraseña</label>
+                    <input type="password" id="registerPassword" required placeholder="••••••••" autocomplete="new-password" minlength="6">
+                    <small>Mínimo 6 caracteres</small>
+                </div>
+                <div class="form-group">
+                    <label for="registerPasswordConfirm">Confirmar Contraseña</label>
+                    <input type="password" id="registerPasswordConfirm" required placeholder="••••••••" autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    Registrarse ✨
+                </button>
+            </form>
+            
+            <!-- TOGGLE BUTTON -->
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <button id="toggleAuthMode" class="btn-link">
+                    ¿No tienes cuenta? Regístrate
+                </button>
             </div>
         </div>
     </section>
@@ -42,8 +74,8 @@
                 </div>
                 <div class="header-right">
                     <div class="user-menu">
-                        <img id="userPhoto" class="user-photo" src="" alt="User">
-                        <span id="userName" class="user-name"></span>
+                        <div class="user-photo" id="userAvatar"></div>
+                        <span id="userNameDisplay" class="user-name"></span>
                         <button id="btnLogout" class="btn-logout">Salir</button>
                     </div>
                 </div>
@@ -58,12 +90,9 @@
                     <h2>Mis Álbumes</h2>
                     <div class="actions">
                         <button id="btnNewAlbum" class="btn btn-primary">+ Nuevo Álbum</button>
-                        <button id="btnManageCategories" class="btn btn-secondary">📂 Categorías</button>
                     </div>
                 </div>
-                <div id="albumsGrid" class="albums-grid">
-                    <!-- Albums will be rendered here -->
-                </div>
+                <div id="albumsGrid" class="albums-grid"></div>
             </section>
 
             <!-- VIEW: ALBUM DETAIL -->
@@ -75,6 +104,7 @@
                         <p id="albumMeta"></p>
                     </div>
                     <div class="actions">
+                        <button id="btnManageCategories" class="btn btn-secondary">📂 Categorías</button>
                         <button id="btnEditAlbum" class="btn-icon" title="Editar">✏️</button>
                         <button id="btnDeleteAlbum" class="btn-icon" title="Eliminar">🗑️</button>
                     </div>
@@ -101,89 +131,105 @@
 
                 <div class="toolbar">
                     <button id="btnNewCard" class="btn btn-primary">+ Añadir Cromo</button>
-                    <button id="btnViewFalta" class="btn btn-outline">📋 Ver Faltan</button>
-                    <button id="btnViewRepetido" class="btn btn-outline">📋 Ver Repetidos</button>
+                    <button id="btnViewFalta" class="btn btn-outline">📋 Faltan</button>
+                    <button id="btnViewRepetido" class="btn btn-outline">📋 Repetidos</button>
                     <button id="btnImport" class="btn btn-secondary">📥 Importar</button>
                     <button id="btnExport" class="btn btn-secondary">📤 Exportar</button>
                 </div>
-
-                <div id="cardsGrid" class="cards-grid">
-                    <!-- Cards will be rendered here -->
+                
+                <div class="filters-bar">
+                    <input type="text" id="filterSearch" placeholder="🔍 Buscar por jugador..." class="filter-input">
+                    <select id="filterTeam" class="filter-select">
+                        <option value="">Todos los equipos</option>
+                    </select>
+                    <select id="filterCategory" class="filter-select">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                    <select id="filterStatus" class="filter-select">
+                        <option value="">Todos los estados</option>
+                        <option value="tengo">Tengo</option>
+                        <option value="falta">Faltan</option>
+                        <option value="repetido">Repetidos</option>
+                    </select>
+                    <button id="btnClearFilters" class="btn-icon" title="Limpiar filtros">🔄</button>
                 </div>
+
+                <div id="cardsGrid" class="cards-list"></div>
             </section>
         </main>
 
-        <!-- MODAL: ALBUM FORM -->
+        <!-- MODALS -->
         <div id="modalAlbum" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="modalAlbumTitle">Nuevo Álbum</h3>
                     <button class="btn-close" data-close="modalAlbum">×</button>
                 </div>
-                <form id="formAlbum">
-                    <div class="form-group">
-                        <label for="albumName">Nombre *</label>
-                        <input type="text" id="albumName" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="albumSeason">Temporada</label>
-                        <input type="text" id="albumSeason" placeholder="Ej: 2023-2024">
-                    </div>
-                    <div class="form-group">
-                        <label for="albumCompetition">Competición</label>
-                        <input type="text" id="albumCompetition" placeholder="Ej: LaLiga">
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" data-close="modalAlbum">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                    </div>
-                </form>
+                <div class="modal-body">
+                    <form id="formAlbum">
+                        <div class="form-group">
+                            <label for="albumName">Nombre *</label>
+                            <input type="text" id="albumName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="albumSeason">Temporada</label>
+                            <input type="text" id="albumSeason" placeholder="Ej: 2023-2024">
+                        </div>
+                        <div class="form-group">
+                            <label for="albumCompetition">Competición</label>
+                            <input type="text" id="albumCompetition" placeholder="Ej: LaLiga">
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" data-close="modalAlbum">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        <!-- MODAL: CARD FORM -->
         <div id="modalCard" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="modalCardTitle">Nuevo Cromo</h3>
                     <button class="btn-close" data-close="modalCard">×</button>
                 </div>
-                <form id="formCard">
-                    <div class="form-group">
-                        <label for="cardNumber">Número</label>
-                        <input type="number" id="cardNumber" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardPlayer">Jugador *</label>
-                        <input type="text" id="cardPlayer" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardTeam">Equipo *</label>
-                        <input type="text" id="cardTeam" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardCategory">Categoría *</label>
-                        <select id="cardCategory" required>
-                            <!-- Categories loaded dynamically -->
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="cardStatus">Estado</label>
-                        <select id="cardStatus">
-                            <option value="falta">Falta</option>
-                            <option value="tengo">Tengo</option>
-                            <option value="repetido">Repetido</option>
-                        </select>
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-secondary" data-close="modalCard">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                    </div>
-                </form>
+                <div class="modal-body">
+                    <form id="formCard">
+                        <div class="form-group">
+                            <label for="cardNumber">Número</label>
+                            <input type="number" id="cardNumber" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cardPlayer">Jugador *</label>
+                            <input type="text" id="cardPlayer" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cardTeam">Equipo *</label>
+                            <input type="text" id="cardTeam" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cardCategory">Categoría *</label>
+                            <select id="cardCategory" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="cardHasIt"> Lo tengo
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="cardDuplicates">Repetidos (cantidad)</label>
+                            <input type="number" id="cardDuplicates" min="0" value="0">
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" data-close="modalCard">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        <!-- MODAL: CATEGORIES -->
         <div id="modalCategories" class="modal">
             <div class="modal-content modal-large">
                 <div class="modal-header">
@@ -196,14 +242,22 @@
                         <input type="color" id="categoryColor" value="#10B981">
                         <button type="submit" class="btn btn-primary">+ Añadir</button>
                     </form>
-                    <div id="categoriesList" class="categories-list">
-                        <!-- Categories rendered here -->
+                    <div id="categoriesList" class="categories-list"></div>
+                    
+                    <!-- Modal para editar categoría -->
+                    <div id="editCategorySection" class="edit-section hidden">
+                        <h4>Editar Categoría</h4>
+                        <form id="formEditCategory" class="inline-form">
+                            <input type="text" id="editCategoryName" required>
+                            <input type="color" id="editCategoryColor">
+                            <button type="submit" class="btn btn-primary">Guardar</button>
+                            <button type="button" id="btnCancelEditCategory" class="btn btn-secondary">Cancelar</button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL: CARD LIST (Faltan/Repetidos) -->
         <div id="modalCardList" class="modal">
             <div class="modal-content modal-large">
                 <div class="modal-header">
@@ -211,14 +265,19 @@
                     <button class="btn-close" data-close="modalCardList">×</button>
                 </div>
                 <div class="modal-body">
-                    <div id="cardListContent" class="card-list">
-                        <!-- Cards rendered here -->
+                    <div class="filters-bar" style="margin-bottom: 1rem;">
+                        <select id="filterListTeam" class="filter-select">
+                            <option value="">Todos los equipos</option>
+                        </select>
+                        <select id="filterListCategory" class="filter-select">
+                            <option value="">Todas las categorías</option>
+                        </select>
                     </div>
+                    <div id="cardListContent" class="card-list-compact"></div>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL: IMPORT -->
         <div id="modalImport" class="modal">
             <div class="modal-content modal-large">
                 <div class="modal-header">
@@ -231,7 +290,7 @@
                         <select id="importFormat">
                             <option value="json">JSON</option>
                             <option value="csv">CSV</option>
-                            <option value="txt">TXT (línea por cromo)</option>
+                            <option value="txt">TXT</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -240,9 +299,9 @@
                         <textarea id="importText" rows="10" placeholder="O pega aquí el contenido..."></textarea>
                     </div>
                     <div class="help-text">
-                        <strong>Formato JSON:</strong> [{"number":1,"playerName":"Courtois","team":"Real Madrid","categoryId":1,"status":"tengo"}]<br>
-                        <strong>Formato CSV:</strong> number,playerName,team,categoryId,status<br>
-                        <strong>Formato TXT:</strong> 1|Courtois|Real Madrid|1|tengo
+                        <strong>JSON:</strong> [{"number":1,"playerName":"Courtois","team":"Real Madrid","categoryId":1,"hasIt":true,"duplicatesCount":2}]<br>
+                        <strong>CSV:</strong> number,playerName,team,categoryId,hasIt,duplicatesCount<br>
+                        <strong>TXT:</strong> 1|Courtois|Real Madrid|1|true|2
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" data-close="modalImport">Cancelar</button>
@@ -252,7 +311,6 @@
             </div>
         </div>
 
-        <!-- MODAL: EXPORT -->
         <div id="modalExport" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
@@ -277,12 +335,10 @@
         </div>
     </div>
 
-    <!-- LOADER -->
     <div id="loader" class="loader hidden">
         <div class="spinner"></div>
     </div>
 
-    <!-- TOAST -->
     <div id="toast" class="toast"></div>
 
     <script src="config.js"></script>

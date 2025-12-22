@@ -6,8 +6,9 @@ const APP_CONFIG = {
   // URL de tu Google Apps Script
   API_URL: 'https://script.google.com/macros/s/AKfycbwUagbwJM4pjlGRtMcnUNLB2QTH1AZ9GhQdMjSjwmDLCCQYv2U41kjmRc04y_s7gBpc5A/exec',
   
-  // Google OAuth Client ID
-  GOOGLE_CLIENT_ID: '576598653306-fm5g5lo3lisp7fhq25h7222fdaqti70v.apps.googleusercontent.com',
+  // Google OAuth Client ID - Cópialo EXACTAMENTE desde Google Cloud Console
+  // Ejemplo: '123456789-abcdefg.apps.googleusercontent.com'
+  GOOGLE_CLIENT_ID: 'TU_CLIENT_ID_AQUI.apps.googleusercontent.com',
   
   // Configuración de la app
   APP_NAME: 'Gestor de Cromos',
