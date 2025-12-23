@@ -92,6 +92,9 @@
                         <button id="btnNewAlbum" class="btn btn-primary">+ Nuevo Álbum</button>
                     </div>
                 </div>
+                <div class="filters-bar">
+                    <input type="text" id="filterAlbumSearch" placeholder="🔍 Buscar álbum..." class="filter-input">
+                </div>
                 <div id="albumsGrid" class="albums-grid"></div>
             </section>
 
@@ -133,6 +136,7 @@
                     <button id="btnNewCard" class="btn btn-primary">+ Añadir Cromo</button>
                     <button id="btnViewFalta" class="btn btn-outline">📋 Faltan</button>
                     <button id="btnViewRepetido" class="btn btn-outline">📋 Repetidos</button>
+                    <button id="btnToggleView" class="btn btn-secondary">🔄 Vista Álbum</button>
                     <button id="btnImport" class="btn btn-secondary">📥 Importar</button>
                     <button id="btnExport" class="btn btn-secondary">📤 Exportar</button>
                 </div>
@@ -211,11 +215,17 @@
                         <div class="form-group">
                             <label for="cardCategory">Categoría *</label>
                             <select id="cardCategory" required></select>
+                            <label style="margin-top: 8px;">
+                                <input type="checkbox" id="cardIsBasic"> Es categoría básica (escudos/plantillas)
+                            </label>
                         </div>
                         <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="cardHasIt"> Lo tengo
-                            </label>
+                            <label for="cardStatus">Estado</label>
+                            <select id="cardStatus">
+                                <option value="falta">Falta</option>
+                                <option value="tengo">Tengo</option>
+                                <option value="cambiado">Cambiado</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="cardDuplicates">Repetidos (cantidad)</label>
@@ -240,6 +250,9 @@
                     <form id="formCategory" class="inline-form">
                         <input type="text" id="categoryName" placeholder="Nombre categoría" required>
                         <input type="color" id="categoryColor" value="#10B981">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="categoryIsBasic"> Básica
+                        </label>
                         <button type="submit" class="btn btn-primary">+ Añadir</button>
                     </form>
                     <div id="categoriesList" class="categories-list"></div>
@@ -265,15 +278,24 @@
                     <button class="btn-close" data-close="modalCardList">×</button>
                 </div>
                 <div class="modal-body">
-                    <div class="filters-bar" style="margin-bottom: 1rem;">
-                        <select id="filterListTeam" class="filter-select">
-                            <option value="">Todos los equipos</option>
-                        </select>
-                        <select id="filterListCategory" class="filter-select">
-                            <option value="">Todas las categorías</option>
-                        </select>
+                    <div class="view-toggle" style="margin-bottom: 1rem;">
+                        <button id="btnViewText" class="btn btn-sm active">📝 Texto</button>
+                        <button id="btnViewGrouped" class="btn btn-sm">📊 Agrupado</button>
                     </div>
-                    <div id="cardListContent" class="card-list-compact"></div>
+                    
+                    <div id="viewTextContent" class="view-content active">
+                        <button id="btnCopyText" class="btn btn-outline" style="margin-bottom: 1rem;">📋 Copiar todos</button>
+                        <div id="textListContent" class="text-list"></div>
+                    </div>
+                    
+                    <div id="viewGroupedContent" class="view-content">
+                        <div class="filters-bar" style="margin-bottom: 1rem;">
+                            <select id="filterListCategory" class="filter-select">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                        </div>
+                        <div id="groupedListContent"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -299,9 +321,9 @@
                         <textarea id="importText" rows="10" placeholder="O pega aquí el contenido..."></textarea>
                     </div>
                     <div class="help-text">
-                        <strong>JSON:</strong> [{"number":1,"playerName":"Courtois","team":"Real Madrid","categoryId":1,"hasIt":true,"duplicatesCount":2}]<br>
-                        <strong>CSV:</strong> number,playerName,team,categoryId,hasIt,duplicatesCount<br>
-                        <strong>TXT:</strong> 1|Courtois|Real Madrid|1|true|2
+                        <strong>JSON:</strong> [{"number":"1","playerName":"Courtois","team":"Real Madrid","categoryId":1,"status":"tengo","duplicatesCount":2}]<br>
+                        <strong>CSV:</strong> number,playerName,team,categoryId,status,duplicatesCount<br>
+                        <strong>TXT:</strong> 1|Courtois|Real Madrid|1|tengo|2
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" data-close="modalImport">Cancelar</button>

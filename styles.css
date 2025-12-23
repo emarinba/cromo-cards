@@ -20,18 +20,22 @@
     
     --tengo: #10B981;
     --falta: #EF4444;
+    --cambiado: #F59E0B;
     --repetido: #F59E0B;
     
-    --bg: #F0FDF4;
+    --bg: #ffffff;
     --bg-card: #ffffff;
+    --bg-tengo: #F0FDF4;
+    --bg-falta: #FEF2F2;
+    --bg-cambiado: #FFFBEB;
     --text: #1F2937;
     --text-secondary: #6B7280;
-    --border: #D1FAE5;
+    --border: #E5E7EB;
     
-    --shadow: 0 4px 6px rgba(16, 185, 129, 0.1);
-    --shadow-lg: 0 10px 25px rgba(16, 185, 129, 0.2);
+    --shadow: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
     
-    --radius: 12px;
+    --radius: 8px;
     --spacing: 16px;
     
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -62,9 +66,15 @@
     100% { background-position: 1000px 0; }
 }
 
+@keyframes popIn {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
+    background: var(--bg);
     color: var(--text);
     line-height: 1.6;
     min-height: 100vh;
@@ -435,6 +445,7 @@ body {
     cursor: pointer;
     transition: var(--transition);
     border: 2px solid transparent;
+    border-left: 6px solid;
     position: relative;
     overflow: hidden;
     animation: fadeIn 0.5s ease-out;
@@ -446,14 +457,15 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 4px;
-    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+    height: 100%;
+    opacity: 0.05;
+    pointer-events: none;
 }
 
 .album-card:hover {
-    transform: translateY(-8px) scale(1.02);
+    transform: translateY(-4px) scale(1.02);
     box-shadow: var(--shadow-lg);
-    border-color: var(--primary);
+    border-color: currentColor;
 }
 
 .album-card h3 {
@@ -467,34 +479,6 @@ body {
     color: var(--text-secondary);
     font-size: 0.9rem;
     margin-bottom: 6px;
-}
-
-.album-card .progress {
-    margin-top: var(--spacing);
-    height: 10px;
-    background: var(--border);
-    border-radius: 5px;
-    overflow: hidden;
-    position: relative;
-}
-
-.album-card .progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--success), var(--primary-light));
-    transition: width 0.6s ease-out;
-    position: relative;
-    overflow: hidden;
-}
-
-.album-card .progress-bar::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 2s linear infinite;
 }
 
 /* ========================================
@@ -552,7 +536,6 @@ body {
     font-size: 2.5rem;
     font-weight: 800;
     color: var(--primary);
-    animation: pulse 2s ease-in-out infinite;
 }
 
 .stat-tengo .stat-value { color: var(--tengo); }
@@ -597,47 +580,61 @@ body {
 }
 
 /* ========================================
-   CARDS LIST (COMPACTA)
+   CARDS LIST - VISTA LISTA MEJORADA
    ======================================== */
 
 .cards-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .card-list-item-compact {
     display: grid;
-    grid-template-columns: 60px 1fr auto auto;
+    grid-template-columns: 70px 1fr auto;
     gap: 12px;
-    padding: 12px;
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    border-left: 4px solid;
-    transition: var(--transition);
+    padding: 12px 16px;
+    border-radius: 10px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     align-items: center;
+    cursor: pointer;
+    border-left: 5px solid;
+    min-height: 60px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .card-list-item-compact:hover {
     transform: translateX(5px);
-    box-shadow: var(--shadow);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
 
 .card-list-item-compact.status-tengo {
-    border-left-color: var(--tengo);
-    background: linear-gradient(90deg, #F0FDF4 0%, #ffffff 100%);
+    border-left-color: #10B981;
+    background: linear-gradient(90deg, #F0FDF4 0%, #ffffff 15%);
 }
 
 .card-list-item-compact.status-falta {
-    border-left-color: var(--falta);
-    background: linear-gradient(90deg, #FEF2F2 0%, #ffffff 100%);
+    border-left-color: #EF4444;
+    background: linear-gradient(90deg, #FEF2F2 0%, #ffffff 15%);
+}
+
+.card-list-item-compact.status-cambiado {
+    border-left-color: #F59E0B;
+    background: linear-gradient(90deg, #FFFBEB 0%, #ffffff 15%);
 }
 
 .card-list-item-compact .card-num {
-    font-weight: 800;
-    font-size: 1.3rem;
-    color: var(--primary);
+    font-weight: 900;
+    font-size: 1.6rem;
+    color: var(--text);
     text-align: center;
+    padding: 10px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 8px;
+    user-select: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    border: 2px solid var(--border);
 }
 
 .card-list-item-compact .card-info {
@@ -649,92 +646,428 @@ body {
 .card-list-item-compact .card-name {
     font-weight: 700;
     font-size: 1rem;
+    line-height: 1.3;
+    color: var(--text);
 }
 
 .card-list-item-compact .card-meta {
     font-size: 0.85rem;
     color: var(--text-secondary);
-}
-
-.card-list-item-compact .card-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.btn-compact {
-    padding: 6px 12px;
-    border: 2px solid;
-    background: transparent;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    transition: var(--transition);
-    white-space: nowrap;
-}
-
-.btn-compact:hover {
-    transform: scale(1.05);
-}
-
-.btn-compact.active {
-    color: white;
-}
-
-.btn-compact.btn-has {
-    border-color: var(--tengo);
-    color: var(--tengo);
-}
-
-.btn-compact.btn-has.active {
-    background: var(--tengo);
-}
-
-.card-list-item-compact .duplicates-input {
-    width: 60px;
-    padding: 6px;
-    border: 2px solid var(--warning);
-    border-radius: 6px;
-    text-align: center;
-    font-weight: 700;
-    font-size: 0.9rem;
+    line-height: 1.3;
+    margin-top: 2px;
 }
 
 /* ========================================
-   CARD LIST COMPACT (Modal)
+   BOTONES HORIZONTALES MEJORADOS
    ======================================== */
 
-.card-list-compact {
+.card-actions-horizontal {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.status-btn-horizontal {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 3px solid;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.3rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.status-btn-horizontal:hover {
+    transform: scale(1.1) translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.status-btn-horizontal:active {
+    transform: scale(0.95);
+}
+
+.status-btn-horizontal[data-status="falta"] {
+    border-color: #EF4444;
+    color: #EF4444;
+}
+
+.status-btn-horizontal[data-status="falta"]:hover {
+    background: #FEF2F2;
+}
+
+.status-btn-horizontal[data-status="falta"].active {
+    background: #EF4444;
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    border-color: #DC2626;
+    animation: popIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.status-btn-horizontal[data-status="tengo"] {
+    border-color: #10B981;
+    color: #10B981;
+}
+
+.status-btn-horizontal[data-status="tengo"]:hover {
+    background: #F0FDF4;
+}
+
+.status-btn-horizontal[data-status="tengo"].active {
+    background: #10B981;
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    border-color: #059669;
+    animation: popIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.status-btn-horizontal[data-status="cambiado"] {
+    border-color: #F59E0B;
+    color: #F59E0B;
+}
+
+.status-btn-horizontal[data-status="cambiado"]:hover {
+    background: #FFFBEB;
+}
+
+.status-btn-horizontal[data-status="cambiado"].active {
+    background: #F59E0B;
+    color: white;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    border-color: #D97706;
+    animation: popIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.duplicates-input {
+    width: 54px;
+    height: 44px;
+    padding: 8px;
+    border: 3px solid #F59E0B;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 900;
+    font-size: 1rem;
+    background: #FFFBEB;
+    color: #D97706;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.duplicates-input:focus {
+    outline: none;
+    border-color: #D97706;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+    transform: scale(1.05);
+}
+
+.duplicates-input:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* ========================================
+   VISTA ÁLBUM - MEJORADA
+   ======================================== */
+
+.cards-album-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 30px;
+    padding: 12px;
+}
+
+.card-album-item {
+    aspect-ratio: 0.7;
+    border-radius: 12px;
+    display: grid;
+    grid-template-columns: 40px 1fr 40px;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    border: 3px solid;
+    position: relative;
+    overflow: visible;
+}
+
+.card-album-item:hover {
+    transform: translateY(-8px) scale(1.03);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.25);
+    z-index: 10;
+}
+
+.card-album-item.status-tengo {
+    border-color: #10B981;
+    background: linear-gradient(135deg, #F0FDF4 0%, #ffffff 50%);
+}
+
+.card-album-item.status-falta {
+    border-color: #EF4444;
+    background: linear-gradient(135deg, #FEF2F2 0%, #ffffff 50%);
+}
+
+.card-album-item.status-cambiado {
+    border-color: #F59E0B;
+    background: linear-gradient(135deg, #FFFBEB 0%, #ffffff 50%);
+}
+
+/* ========================================
+   BOTONES LATERALES ÁLBUM
+   ======================================== */
+
+.album-side-btn {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.5rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    backdrop-filter: blur(5px);
+}
+
+.album-side-btn.left {
+    border-radius: 12px 0 0 12px;
+    border-right: 2px solid rgba(0,0,0,0.1);
+    color: #EF4444;
+}
+
+.album-side-btn.left:hover {
+    background: #FEF2F2;
+    transform: translateX(-3px);
+}
+
+.album-side-btn.left.active {
+    background: #EF4444;
+    color: white;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+    animation: popIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.album-side-btn.right {
+    border-radius: 0 12px 12px 0;
+    border-left: 2px solid rgba(0,0,0,0.1);
+    color: #10B981;
+}
+
+.album-side-btn.right:hover {
+    background: #F0FDF4;
+    transform: translateX(3px);
+}
+
+.album-side-btn.right.active {
+    background: #10B981;
+    color: white;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+    animation: popIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   CONTENIDO TARJETA ÁLBUM
+   ======================================== */
+
+.album-card-content {
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    gap: 8px;
+}
+
+.album-card-number {
+    font-size: 2.2rem;
+    font-weight: 900;
+    text-align: center;
+    color: var(--text);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    line-height: 1;
+}
+
+.album-card-name {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.1;
+    color: var(--text);
+    padding: 0 4px;
+}
+
+.album-card-team {
+    font-size: 0.7rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.album-bottom-controls {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    padding-top: 4px;
+    border-top: 2px solid rgba(0,0,0,0.05);
+}
+
+.album-mini-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 2px solid #F59E0B;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #F59E0B;
+}
+
+.album-mini-btn:hover {
+    transform: scale(1.1);
+    background: #FFFBEB;
+}
+
+.album-mini-btn.active {
+    background: #F59E0B;
+    color: white;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+.mini-duplicates-input {
+    width: 42px;
+    height: 32px;
+    padding: 4px;
+    border: 2px solid #F59E0B;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 900;
+    font-size: 0.8rem;
+    background: #FFFBEB;
+    color: #D97706;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mini-duplicates-input:focus {
+    outline: none;
+    border-color: #D97706;
+    background: white;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.album-duplicate-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 900;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+    z-index: 5;
+    border: 2px solid white;
+}
+
+/* View toggle */
+.view-toggle {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.btn-sm.active {
+    background: var(--primary);
+    color: white;
+}
+
+.view-content {
+    display: none;
+}
+
+.view-content.active {
+    display: block;
+}
+
+/* Text list view */
+.text-list {
+    padding: 1rem;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Grouped list view */
+.grouped-section {
+    margin-bottom: 1.5rem;
+}
+
+.grouped-section h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.grouped-section .badge-basic {
+    background: var(--primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.grouped-section .numbers-list {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.card-number-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 50px;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    border-radius: 8px;
-    font-weight: 800;
-    font-size: 1.1rem;
-    box-shadow: var(--shadow);
-    transition: var(--transition);
-    cursor: pointer;
+.grouped-section .number-item {
+    background: white;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
 }
 
-.card-number-badge:hover {
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: var(--shadow-lg);
-}
+/* ========================================
+   CARD LIST COMPACT (Modal) - ELIMINADO
+   ======================================== */
 
-.card-number-badge.has-duplicate {
-    background: linear-gradient(135deg, var(--warning), #F59E0B);
-}
+/* Ya no se usa la vista de badges, se reemplazó por vistas texto/agrupado */
 
 /* ========================================
    EDIT SECTION

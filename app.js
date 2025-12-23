@@ -10,13 +10,16 @@ const STATE = {
     currentAlbumId: null,
     currentCardId: null,
     currentCategoryId: null,
-    sessionExpiry: 24 * 60 * 60 * 1000, // 24 horas
+    sessionExpiry: 24 * 60 * 60 * 1000,
     filters: {
         search: '',
         team: '',
         category: '',
-        status: ''
-    }
+        status: '',
+        albumSearch: ''
+    },
+    viewMode: 'list',
+    listViewMode: 'text'
 };
 
 // ========================================
@@ -59,9 +62,31 @@ const Utils = {
     },
     
     getNextCardNumber(cards) {
-        if (!cards.length) return 1;
-        const maxNumber = Math.max(...cards.map(c => parseInt(c.number) || 0));
-        return maxNumber + 1;
+        if (!cards.length) return '1';
+        
+        const numbers = cards.filter(c => !isNaN(c.number)).map(c => parseInt(c.number));
+        
+        if (numbers.length) {
+            return (Math.max(...numbers) + 1).toString();
+        }
+        
+        return '1';
+    },
+    
+    sortCards(cards) {
+        return [...cards].sort((a, b) => {
+            const aNum = parseInt(a.number);
+            const bNum = parseInt(b.number);
+            
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return aNum - bNum;
+            }
+            
+            if (!isNaN(aNum)) return -1;
+            if (!isNaN(bNum)) return 1;
+            
+            return a.number.localeCompare(b.number);
+        });
     },
     
     generateAvatar(name) {
@@ -94,8 +119,6 @@ const API = {
             throw new Error('API URL no configurada');
         }
         
-        console.log('📡 API_URL:', APP_CONFIG.API_URL);
-        
         let url = `${APP_CONFIG.API_URL}?path=${path}&action=${action}`;
         
         if (STATE.user && path !== 'users') {
@@ -117,15 +140,9 @@ const API = {
             });
         }
         
-        console.log('📡 URL FINAL:', url);
-        
         try {
-            console.log('📡 Haciendo fetch...');
             const response = await fetch(url, { method: 'GET' });
-            console.log('📡 Response status:', response.status);
-            
             const result = await response.json();
-            console.log('📡 Response data:', result);
             
             if (!result.success) {
                 throw new Error(result.error || 'Error en la petición');
@@ -270,8 +287,6 @@ const Auth = {
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
         
-        console.log('🔵 LOGIN: Email:', email);
-        
         if (!email || !password) {
             Utils.showToast('Completa todos los campos', 'warning');
             return;
@@ -280,10 +295,7 @@ const Auth = {
         Utils.showLoader();
         
         try {
-            console.log('🔵 LOGIN: Llamando a API.login...');
             const user = await API.login(email, password);
-            console.log('🔵 LOGIN: Usuario recibido:', user);
-            
             STATE.user = user;
             Session.save(user);
             
@@ -314,9 +326,6 @@ const Auth = {
         const password = document.getElementById('registerPassword').value;
         const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
         
-        console.log('🟢 REGISTER: Nombre:', name);
-        console.log('🟢 REGISTER: Email:', email);
-        
         if (!name || !email || !password) {
             Utils.showToast('Completa todos los campos', 'warning');
             return;
@@ -335,10 +344,7 @@ const Auth = {
         Utils.showLoader();
         
         try {
-            console.log('🟢 REGISTER: Llamando a API.register...');
             const user = await API.register(name, email, password);
-            console.log('🟢 REGISTER: Usuario creado:', user);
-            
             STATE.user = user;
             Session.save(user);
             
@@ -385,273 +391,15 @@ const Auth = {
     }
 };
 
-// ========================================
-// RENDERIZADORES
-// ========================================
-
-const Render = {
-    albums() {
-        const container = document.getElementById('albumsGrid');
-        
-        if (!STATE.albums.length) {
-            container.innerHTML = `
-                <div class="empty-state" style="grid-column: 1/-1;">
-                    <div class="empty-state-icon">📚</div>
-                    <h3>No hay álbumes</h3>
-                    <p>Crea tu primer álbum para comenzar</p>
-                </div>
-            `;
-            return;
-        }
-        
-        container.innerHTML = STATE.albums.map(album => `
-            <div class="album-card" data-id="${album.id}">
-                <h3>${album.name}</h3>
-                ${album.season ? `<p>🗓️ ${album.season}</p>` : ''}
-                ${album.competition ? `<p>🏆 ${album.competition}</p>` : ''}
-                <p style="margin-top: 8px;">📅 ${Utils.formatDate(album.createdAt)}</p>
-            </div>
-        `).join('');
-        
-        container.querySelectorAll('.album-card').forEach(card => {
-            card.addEventListener('click', () => {
-                Controllers.openAlbum(card.dataset.id);
-            });
-        });
-    },
-    
-    albumDetail(albumId) {
-        const album = STATE.albums.find(a => a.id == albumId);
-        
-        document.getElementById('albumTitle').textContent = album.name;
-        document.getElementById('albumMeta').innerHTML = `
-            ${album.season ? `🗓️ ${album.season}` : ''}
-            ${album.competition ? `• 🏆 ${album.competition}` : ''}
-        `;
-        
-        this.cards();
-        this.stats();
-    },
-    
-    cards() {
-        const container = document.getElementById('cardsGrid');
-        
-        if (!STATE.cards.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🃏</div>
-                    <h3>No hay cromos</h3>
-                    <p>Añade cromos a este álbum</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Aplicar filtros
-        let filteredCards = [...STATE.cards];
-        
-        if (STATE.filters.search) {
-            const search = STATE.filters.search.toLowerCase();
-            filteredCards = filteredCards.filter(c => 
-                c.playerName.toLowerCase().includes(search) ||
-                c.team.toLowerCase().includes(search)
-            );
-        }
-        
-        if (STATE.filters.team) {
-            filteredCards = filteredCards.filter(c => c.team === STATE.filters.team);
-        }
-        
-        if (STATE.filters.category) {
-            filteredCards = filteredCards.filter(c => c.categoryId == STATE.filters.category);
-        }
-        
-        if (STATE.filters.status) {
-            if (STATE.filters.status === 'tengo') {
-                filteredCards = filteredCards.filter(c => c.hasIt);
-            } else if (STATE.filters.status === 'falta') {
-                filteredCards = filteredCards.filter(c => !c.hasIt);
-            } else if (STATE.filters.status === 'repetido') {
-                filteredCards = filteredCards.filter(c => c.duplicatesCount > 0);
-            }
-        }
-        
-        const sortedCards = filteredCards.sort((a, b) => a.number - b.number);
-        
-        container.innerHTML = sortedCards.map(card => {
-            const category = STATE.categories.find(c => c.id == card.categoryId);
-            const statusClass = card.hasIt ? 'status-tengo' : 'status-falta';
-            
-            return `
-                <div class="card-list-item-compact ${statusClass}" data-id="${card.id}">
-                    <div class="card-num">#${card.number}</div>
-                    <div class="card-info">
-                        <div class="card-name">${card.playerName}</div>
-                        <div class="card-meta">
-                            ${card.team}
-                            ${category ? `• <span style="color: ${category.color}">⬤</span> ${category.name}` : ''}
-                        </div>
-                    </div>
-                    <div class="card-actions">
-                        <button class="btn-compact btn-has ${card.hasIt ? 'active' : ''}" 
-                                data-field="hasIt" data-value="${!card.hasIt}">
-                            ${card.hasIt ? '✓' : '✗'}
-                        </button>
-                        <input type="number" 
-                               class="duplicates-input" 
-                               value="${card.duplicatesCount}" 
-                               min="0" 
-                               data-id="${card.id}"
-                               placeholder="0">
-                    </div>
-                    <button class="btn-icon" title="Editar" onclick="Controllers.openEditCard('${card.id}')">✏️</button>
-                </div>
-            `;
-        }).join('');
-        
-        // Event listeners para botones hasIt
-        container.querySelectorAll('.btn-has').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const cardId = btn.closest('.card-list-item-compact').dataset.id;
-                const value = btn.dataset.value === 'true';
-                await Controllers.updateCardStatus(cardId, 'hasIt', value);
-            });
-        });
-        
-        // Event listeners para inputs de duplicados
-        container.querySelectorAll('.duplicates-input').forEach(input => {
-            input.addEventListener('change', async (e) => {
-                const cardId = e.target.dataset.id;
-                const value = parseInt(e.target.value) || 0;
-                await Controllers.updateCardStatus(cardId, 'duplicatesCount', value);
-            });
-        });
-        
-        this.updateFilterOptions();
-    },
-    
-    updateFilterOptions() {
-        // Equipos únicos
-        const teams = [...new Set(STATE.cards.map(c => c.team))].sort();
-        const teamSelect = document.getElementById('filterTeam');
-        if (teamSelect) {
-            teamSelect.innerHTML = '<option value="">Todos los equipos</option>' + 
-                teams.map(t => `<option value="${t}">${t}</option>`).join('');
-            teamSelect.value = STATE.filters.team;
-        }
-        
-        // Categorías
-        const categorySelect = document.getElementById('filterCategory');
-        if (categorySelect) {
-            categorySelect.innerHTML = '<option value="">Todas las categorías</option>' + 
-                STATE.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            categorySelect.value = STATE.filters.category;
-        }
-        
-        // Estado
-        const statusSelect = document.getElementById('filterStatus');
-        if (statusSelect) {
-            statusSelect.value = STATE.filters.status;
-        }
-    },
-    
-    stats() {
-        const total = STATE.cards.length;
-        const tengo = STATE.cards.filter(c => c.hasIt).length;
-        const falta = STATE.cards.filter(c => !c.hasIt).length;
-        const repetido = STATE.cards.filter(c => c.duplicatesCount > 0).length;
-        
-        document.getElementById('statTotal').textContent = total;
-        document.getElementById('statTengo').textContent = tengo;
-        document.getElementById('statFalta').textContent = falta;
-        document.getElementById('statRepetido').textContent = repetido;
-    },
-    
-    categories() {
-        const select = document.getElementById('cardCategory');
-        
-        if (!STATE.categories.length) {
-            select.innerHTML = '<option value="">Crea una categoría primero</option>';
-            return;
-        }
-        
-        select.innerHTML = STATE.categories.map(cat => `
-            <option value="${cat.id}">${cat.name}</option>
-        `).join('');
-        
-        const list = document.getElementById('categoriesList');
-        list.innerHTML = STATE.categories.map(cat => `
-            <div class="category-item">
-                <div class="category-color" style="background: ${cat.color}"></div>
-                <div class="category-name">${cat.name}</div>
-                <button class="btn-icon" onclick="Controllers.openEditCategory(${cat.id})" title="Editar">✏️</button>
-                <button class="btn-icon" onclick="Controllers.deleteCategory(${cat.id})" title="Eliminar">🗑️</button>
-            </div>
-        `).join('');
-    },
-    
-    cardList(cards, title, filterTeam = '', filterCategory = '') {
-        document.getElementById('modalCardListTitle').textContent = title;
-        const container = document.getElementById('cardListContent');
-        
-        // Filtros en el modal
-        let filteredCards = [...cards];
-        
-        if (filterTeam) {
-            filteredCards = filteredCards.filter(c => c.team === filterTeam);
-        }
-        
-        if (filterCategory) {
-            filteredCards = filteredCards.filter(c => c.categoryId == filterCategory);
-        }
-        
-        if (!filteredCards.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <p>No hay cromos que cumplan los filtros</p>
-                </div>
-            `;
-            return;
-        }
-        
-        const sortedCards = filteredCards.sort((a, b) => a.number - b.number);
-        
-        // Mostrar solo los números de los cromos
-        container.innerHTML = sortedCards.map(card => {
-            const duplicateClass = card.duplicatesCount > 0 ? 'has-duplicate' : '';
-            const duplicateText = card.duplicatesCount > 0 ? ` (x${card.duplicatesCount})` : '';
-            return `
-                <div class="card-number-badge ${duplicateClass}" 
-                     title="${card.playerName} - ${card.team}${duplicateText}">
-                    ${card.number}
-                </div>
-            `;
-        }).join('');
-        
-        // Actualizar filtros del modal
-        const teams = [...new Set(cards.map(c => c.team))].sort();
-        const teamSelect = document.getElementById('filterListTeam');
-        if (teamSelect) {
-            teamSelect.innerHTML = '<option value="">Todos los equipos</option>' + 
-                teams.map(t => `<option value="${t}">${t}</option>`).join('');
-            teamSelect.value = filterTeam;
-        }
-        
-        const categorySelect = document.getElementById('filterListCategory');
-        if (categorySelect) {
-            categorySelect.innerHTML = '<option value="">Todas las categorías</option>' + 
-                STATE.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            categorySelect.value = filterCategory;
-        }
-    }
-};
+// Continúa en siguiente mensaje...
 
 // ========================================
 // CONTROLADORES
 // ========================================
 
 const Controllers = {
+    currentModalCards: [],
+    
     async init() {
         await this.loadAlbums();
         this.setupEventListeners();
@@ -669,7 +417,8 @@ const Controllers = {
     
     async openAlbum(albumId) {
         STATE.currentAlbumId = albumId;
-        STATE.filters = { search: '', team: '', category: '', status: '' }; // Reset filtros
+        STATE.filters = { search: '', team: '', category: '', status: '' };
+        STATE.viewMode = 'list';
         
         try {
             Utils.showLoader();
@@ -679,7 +428,6 @@ const Controllers = {
             Render.albumDetail(albumId);
             Render.categories();
             
-            // Setup filtros
             this.setupFilters();
         } catch (error) {
             Utils.showToast('Error al cargar álbum: ' + error.message, 'error');
@@ -696,6 +444,7 @@ const Controllers = {
         const btnClearFilters = document.getElementById('btnClearFilters');
         
         if (filterSearch) {
+            filterSearch.value = '';
             filterSearch.addEventListener('input', (e) => {
                 STATE.filters.search = e.target.value;
                 Render.cards();
@@ -735,11 +484,19 @@ const Controllers = {
         }
     },
     
+    toggleView() {
+        STATE.viewMode = STATE.viewMode === 'list' ? 'album' : 'list';
+        const btn = document.getElementById('btnToggleView');
+        btn.textContent = STATE.viewMode === 'list' ? '🔄 Vista Álbum' : '🔄 Vista Lista';
+        Render.cards();
+    },
+    
     async saveAlbum(e) {
         e.preventDefault();
         
         const album = {
             name: document.getElementById('albumName').value,
+            color: document.getElementById('albumColor').value,
             season: document.getElementById('albumSeason').value,
             competition: document.getElementById('albumCompetition').value
         };
@@ -794,11 +551,11 @@ const Controllers = {
         
         const card = {
             albumId: STATE.currentAlbumId,
-            number: parseInt(document.getElementById('cardNumber').value),
+            number: document.getElementById('cardNumber').value,
             playerName: document.getElementById('cardPlayer').value,
             team: document.getElementById('cardTeam').value,
             categoryId: parseInt(categoryId),
-            hasIt: document.getElementById('cardHasIt').checked,
+            status: document.getElementById('cardStatus').value,
             duplicatesCount: parseInt(document.getElementById('cardDuplicates').value) || 0
         };
         
@@ -841,7 +598,8 @@ const Controllers = {
         
         const category = {
             name: document.getElementById('categoryName').value,
-            color: document.getElementById('categoryColor').value
+            color: document.getElementById('categoryColor').value,
+            isBasic: document.getElementById('categoryIsBasic').checked
         };
         
         try {
@@ -881,7 +639,7 @@ const Controllers = {
             STATE.currentCategoryId = null;
             STATE.categories = await API.getCategories(STATE.currentAlbumId);
             Render.categories();
-            Render.cards(); // Refrescar para mostrar nuevos colores
+            Render.cards();
         } catch (error) {
             Utils.showToast('Error: ' + error.message, 'error');
         }
@@ -907,18 +665,61 @@ const Controllers = {
     
     openNewAlbum() {
         STATE.currentAlbumId = null;
-        document.getElementById('modalAlbumTitle').textContent = 'Nuevo Álbum';
-        document.getElementById('formAlbum').reset();
+        
+        // Abrir modal primero
         Utils.openModal('modalAlbum');
+        
+        // Esperar al siguiente tick del event loop para asegurar que el DOM está listo
+        setTimeout(() => {
+            document.getElementById('modalAlbumTitle').textContent = 'Nuevo Álbum';
+            document.getElementById('formAlbum').reset();
+            
+            const colorInput = document.getElementById('albumColor');
+            if (colorInput) {
+                colorInput.value = '#10B981';
+            } else {
+                console.error('❌ No se encontró el input de color del álbum');
+            }
+        }, 0);
     },
     
     openEditAlbum() {
         const album = STATE.albums.find(a => a.id == STATE.currentAlbumId);
-        document.getElementById('modalAlbumTitle').textContent = 'Editar Álbum';
-        document.getElementById('albumName').value = album.name;
-        document.getElementById('albumSeason').value = album.season || '';
-        document.getElementById('albumCompetition').value = album.competition || '';
+        
+        if (!album) {
+            Utils.showToast('No se encontró el álbum', 'error');
+            return;
+        }
+        
+        // Abrir modal primero
         Utils.openModal('modalAlbum');
+        
+        // Esperar al siguiente tick del event loop
+        setTimeout(() => {
+            document.getElementById('modalAlbumTitle').textContent = 'Editar Álbum';
+            
+            const nameInput = document.getElementById('albumName');
+            const colorInput = document.getElementById('albumColor');
+            const seasonInput = document.getElementById('albumSeason');
+            const competitionInput = document.getElementById('albumCompetition');
+            
+            // Validar que todos los elementos existen
+            if (nameInput) nameInput.value = album.name;
+            if (colorInput) colorInput.value = album.color || '#10B981';
+            if (seasonInput) seasonInput.value = album.season || '';
+            if (competitionInput) competitionInput.value = album.competition || '';
+            
+            // Log de debug
+            if (!colorInput) {
+                console.error('❌ No se encontró el input de color del álbum en el DOM');
+                console.log('Elementos encontrados:', {
+                    nameInput: !!nameInput,
+                    colorInput: !!colorInput,
+                    seasonInput: !!seasonInput,
+                    competitionInput: !!competitionInput
+                });
+            }
+        }, 0);
     },
     
     openNewCard() {
@@ -926,8 +727,13 @@ const Controllers = {
         document.getElementById('modalCardTitle').textContent = 'Nuevo Cromo';
         document.getElementById('formCard').reset();
         document.getElementById('cardNumber').value = Utils.getNextCardNumber(STATE.cards);
-        document.getElementById('cardHasIt').checked = false;
+        document.getElementById('cardStatus').value = 'falta';
         document.getElementById('cardDuplicates').value = 0;
+        
+        // Ocultar botón eliminar
+        const btnDelete = document.getElementById('btnDeleteCard');
+        if (btnDelete) btnDelete.classList.add('hidden');
+        
         Utils.openModal('modalCard');
     },
     
@@ -939,58 +745,83 @@ const Controllers = {
         document.getElementById('cardPlayer').value = card.playerName;
         document.getElementById('cardTeam').value = card.team;
         document.getElementById('cardCategory').value = card.categoryId;
-        document.getElementById('cardHasIt').checked = card.hasIt;
+        document.getElementById('cardStatus').value = card.status;
         document.getElementById('cardDuplicates').value = card.duplicatesCount || 0;
+        
+        // Mostrar botón eliminar
+        const btnDelete = document.getElementById('btnDeleteCard');
+        if (btnDelete) btnDelete.classList.remove('hidden');
+        
         Utils.openModal('modalCard');
     },
     
-    showFalta() {
-        const faltaCards = STATE.cards.filter(c => !c.hasIt);
-        Render.cardList(faltaCards, `Cromos que faltan (${faltaCards.length})`);
-        Utils.openModal('modalCardList');
+    async deleteCard() {
+        if (!STATE.currentCardId) return;
         
-        // Setup filtros del modal
-        this.setupModalFilters('falta');
+        if (!confirm('¿Eliminar este cromo?')) return;
+        
+        try {
+            Utils.showLoader();
+            await API.deleteCard(STATE.currentCardId);
+            Utils.showToast('Cromo eliminado');
+            Utils.closeModal('modalCard');
+            STATE.currentCardId = null;
+            await this.openAlbum(STATE.currentAlbumId);
+        } catch (error) {
+            Utils.showToast('Error: ' + error.message, 'error');
+        } finally {
+            Utils.hideLoader();
+        }
+    },
+    
+    showFalta() {
+        const faltaCards = STATE.cards.filter(c => c.status === 'falta');
+        Render.cardListModal(faltaCards, `Cromos que faltan (${faltaCards.length})`);
+        Utils.openModal('modalCardList');
+        this.setupModalViews();
     },
     
     showRepetido() {
         const repetidoCards = STATE.cards.filter(c => c.duplicatesCount > 0);
-        Render.cardList(repetidoCards, `Cromos repetidos (${repetidoCards.length})`);
+        Render.cardListModal(repetidoCards, `Cromos repetidos (${repetidoCards.length})`);
         Utils.openModal('modalCardList');
-        
-        // Setup filtros del modal
-        this.setupModalFilters('repetido');
+        this.setupModalViews();
     },
     
-    setupModalFilters(type) {
-        const filterListTeam = document.getElementById('filterListTeam');
+    setupModalViews() {
+        const btnViewText = document.getElementById('btnViewText');
+        const btnViewGrouped = document.getElementById('btnViewGrouped');
+        const btnCopyText = document.getElementById('btnCopyText');
         const filterListCategory = document.getElementById('filterListCategory');
         
-        if (filterListTeam) {
-            filterListTeam.addEventListener('change', () => {
-                const cards = type === 'falta' 
-                    ? STATE.cards.filter(c => !c.hasIt)
-                    : STATE.cards.filter(c => c.duplicatesCount > 0);
-                Render.cardList(
-                    cards, 
-                    type === 'falta' ? `Cromos que faltan (${cards.length})` : `Cromos repetidos (${cards.length})`,
-                    filterListTeam.value,
-                    filterListCategory.value
-                );
+        if (btnViewText) {
+            btnViewText.replaceWith(btnViewText.cloneNode(true));
+            document.getElementById('btnViewText').addEventListener('click', () => {
+                Render.renderTextView(this.currentModalCards);
+            });
+        }
+        
+        if (btnViewGrouped) {
+            btnViewGrouped.replaceWith(btnViewGrouped.cloneNode(true));
+            document.getElementById('btnViewGrouped').addEventListener('click', () => {
+                Render.renderGroupedView(this.currentModalCards);
+            });
+        }
+        
+        if (btnCopyText) {
+            btnCopyText.replaceWith(btnCopyText.cloneNode(true));
+            document.getElementById('btnCopyText').addEventListener('click', () => {
+                const text = document.getElementById('textListContent').textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                    Utils.showToast('Números copiados al portapapeles');
+                });
             });
         }
         
         if (filterListCategory) {
-            filterListCategory.addEventListener('change', () => {
-                const cards = type === 'falta' 
-                    ? STATE.cards.filter(c => !c.hasIt)
-                    : STATE.cards.filter(c => c.duplicatesCount > 0);
-                Render.cardList(
-                    cards, 
-                    type === 'falta' ? `Cromos que faltan (${cards.length})` : `Cromos repetidos (${cards.length})`,
-                    filterListTeam.value,
-                    filterListCategory.value
-                );
+            filterListCategory.replaceWith(filterListCategory.cloneNode(true));
+            document.getElementById('filterListCategory').addEventListener('change', (e) => {
+                Render.renderGroupedView(this.currentModalCards, e.target.value);
             });
         }
     },
@@ -1020,26 +851,26 @@ const Controllers = {
                 const lines = content.split('\n').filter(l => l.trim());
                 lines.shift();
                 cards = lines.map(line => {
-                    const [number, playerName, team, categoryId, hasIt, duplicatesCount] = line.split(',');
+                    const [number, playerName, team, categoryId, status, duplicatesCount] = line.split(',');
                     return { 
-                        number: parseInt(number), 
+                        number, 
                         playerName, 
                         team, 
                         categoryId: parseInt(categoryId), 
-                        hasIt: hasIt === 'true', 
+                        status: status || 'falta', 
                         duplicatesCount: parseInt(duplicatesCount) || 0
                     };
                 });
             } else if (format === 'txt') {
                 const lines = content.split('\n').filter(l => l.trim());
                 cards = lines.map(line => {
-                    const [number, playerName, team, categoryId, hasIt, duplicatesCount] = line.split('|');
+                    const [number, playerName, team, categoryId, status, duplicatesCount] = line.split('|');
                     return { 
-                        number: parseInt(number), 
+                        number, 
                         playerName, 
                         team, 
                         categoryId: parseInt(categoryId), 
-                        hasIt: hasIt === 'true', 
+                        status: status || 'falta', 
                         duplicatesCount: parseInt(duplicatesCount) || 0
                     };
                 });
@@ -1066,14 +897,14 @@ const Controllers = {
             content = JSON.stringify(STATE.cards, null, 2);
             filename = 'cromos.json';
         } else if (format === 'csv') {
-            content = 'number,playerName,team,categoryId,hasIt,duplicatesCount\n';
+            content = 'number,playerName,team,categoryId,status,duplicatesCount\n';
             content += STATE.cards.map(c => 
-                `${c.number},${c.playerName},${c.team},${c.categoryId},${c.hasIt},${c.duplicatesCount}`
+                `${c.number},${c.playerName},${c.team},${c.categoryId},${c.status},${c.duplicatesCount}`
             ).join('\n');
             filename = 'cromos.csv';
         } else if (format === 'txt') {
             content = STATE.cards.map(c => 
-                `${c.number}|${c.playerName}|${c.team}|${c.categoryId}|${c.hasIt}|${c.duplicatesCount}`
+                `${c.number}|${c.playerName}|${c.team}|${c.categoryId}|${c.status}|${c.duplicatesCount}`
             ).join('\n');
             filename = 'cromos.txt';
         }
@@ -1090,8 +921,10 @@ const Controllers = {
         Utils.closeModal('modalExport');
     },
     
+    // Continúa...
+    
     setupEventListeners() {
-        console.log('🎯 Configurando event listeners de la app...');
+        console.log('🎯 Configurando event listeners...');
         
         const btnLogout = document.getElementById('btnLogout');
         if (btnLogout) {
@@ -1101,6 +934,14 @@ const Controllers = {
         const btnNewAlbum = document.getElementById('btnNewAlbum');
         if (btnNewAlbum) {
             btnNewAlbum.addEventListener('click', () => this.openNewAlbum());
+        }
+        
+        const filterAlbumSearch = document.getElementById('filterAlbumSearch');
+        if (filterAlbumSearch) {
+            filterAlbumSearch.addEventListener('input', (e) => {
+                STATE.filters.albumSearch = e.target.value;
+                Render.albums();
+            });
         }
         
         const btnBackToAlbums = document.getElementById('btnBackToAlbums');
@@ -1131,6 +972,11 @@ const Controllers = {
         const btnViewRepetido = document.getElementById('btnViewRepetido');
         if (btnViewRepetido) {
             btnViewRepetido.addEventListener('click', () => this.showRepetido());
+        }
+        
+        const btnToggleView = document.getElementById('btnToggleView');
+        if (btnToggleView) {
+            btnToggleView.addEventListener('click', () => this.toggleView());
         }
         
         const btnManageCategories = document.getElementById('btnManageCategories');
@@ -1166,6 +1012,11 @@ const Controllers = {
         const formCard = document.getElementById('formCard');
         if (formCard) {
             formCard.addEventListener('submit', (e) => this.saveCard(e));
+        }
+        
+        const btnDeleteCard = document.getElementById('btnDeleteCard');
+        if (btnDeleteCard) {
+            btnDeleteCard.addEventListener('click', () => this.deleteCard());
         }
         
         const formCategory = document.getElementById('formCategory');
@@ -1207,7 +1058,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 APP INICIADA');
     console.log('📋 Config:', APP_CONFIG);
     
-    // Registrar eventos de autenticación PRIMERO
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const toggleBtn = document.getElementById('toggleAuthMode');
@@ -1239,7 +1089,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
     }
     
-    // Intentar auto-login
     const savedUser = Session.load();
     
     if (savedUser) {
@@ -1251,3 +1100,449 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.log('ℹ️ No hay sesión guardada');
     }
 });
+
+// ========================================
+// RENDERIZADORES
+// ========================================
+
+const Render = {
+    albums() {
+        const container = document.getElementById('albumsGrid');
+        
+        // Aplicar filtro de búsqueda
+        let filteredAlbums = STATE.albums;
+        if (STATE.filters.albumSearch) {
+            const search = STATE.filters.albumSearch.toLowerCase();
+            filteredAlbums = STATE.albums.filter(a => 
+                a.name.toLowerCase().includes(search)
+            );
+        }
+        
+        if (!filteredAlbums.length) {
+            container.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1;">
+                    <div class="empty-state-icon">📚</div>
+                    <h3>No hay álbumes</h3>
+                    <p>${STATE.filters.albumSearch ? 'No se encontraron álbumes con ese nombre' : 'Crea tu primer álbum para comenzar'}</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = filteredAlbums.map(album => `
+            <div class="album-card" data-id="${album.id}" style="border-left-color: ${album.color}; color: ${album.color};">
+                <h3>${album.name}</h3>
+                ${album.season ? `<p>🗓️ ${album.season}</p>` : ''}
+                ${album.competition ? `<p>🏆 ${album.competition}</p>` : ''}
+                <p style="margin-top: 8px;">📅 ${Utils.formatDate(album.createdAt)}</p>
+            </div>
+        `).join('');
+        
+        container.querySelectorAll('.album-card').forEach(card => {
+            card.addEventListener('click', () => {
+                Controllers.openAlbum(card.dataset.id);
+            });
+        });
+    },
+    
+    albumDetail(albumId) {
+        const album = STATE.albums.find(a => a.id == albumId);
+        
+        document.getElementById('albumTitle').textContent = album.name;
+        document.getElementById('albumTitle').style.color = album.color;
+        document.getElementById('albumMeta').innerHTML = `
+            ${album.season ? `🗓️ ${album.season}` : ''}
+            ${album.competition ? `• 🏆 ${album.competition}` : ''}
+        `;
+        
+        this.cards();
+        this.stats();
+    },
+    
+    cards() {
+        const container = document.getElementById('cardsGrid');
+        
+        if (!STATE.cards.length) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🃏</div>
+                    <h3>No hay cromos</h3>
+                    <p>Añade cromos a este álbum</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Aplicar filtros
+        let filteredCards = [...STATE.cards];
+        
+        if (STATE.filters.search) {
+            const search = STATE.filters.search.toLowerCase();
+            filteredCards = filteredCards.filter(c => 
+                c.playerName.toLowerCase().includes(search) ||
+                c.team.toLowerCase().includes(search) ||
+                c.number.toLowerCase().includes(search)
+            );
+        }
+        
+        if (STATE.filters.team) {
+            filteredCards = filteredCards.filter(c => c.team === STATE.filters.team);
+        }
+        
+        if (STATE.filters.category) {
+            filteredCards = filteredCards.filter(c => c.categoryId == STATE.filters.category);
+        }
+        
+        if (STATE.filters.status) {
+            filteredCards = filteredCards.filter(c => c.status === STATE.filters.status);
+        }
+        
+        const sortedCards = Utils.sortCards(filteredCards);
+        
+        if (STATE.viewMode === 'list') {
+            this.renderListView(sortedCards, container);
+        } else {
+            this.renderAlbumView(sortedCards, container);
+        }
+        
+        this.updateFilterOptions();
+    },
+    
+    renderListView(cards, container) {
+        container.className = 'cards-list';
+        
+        container.innerHTML = cards.map(card => {
+            const category = STATE.categories.find(c => c.id == card.categoryId);
+            
+            return `
+                <div class="card-list-item-compact status-${card.status}" data-id="${card.id}">
+                    <div class="card-num">${card.number}</div>
+                    <div class="card-info">
+                        <div class="card-name">${card.playerName}</div>
+                        <div class="card-meta">
+                            ${card.team}
+                            ${category ? `• <span style="color: ${category.color}">⬤</span> ${category.name}` : ''}
+                        </div>
+                    </div>
+                    <div class="card-actions-horizontal">
+                        <button class="status-btn-horizontal ${card.status === 'falta' ? 'active' : ''}" 
+                                data-status="falta" title="No lo tengo">
+                            ✗
+                        </button>
+                        <button class="status-btn-horizontal ${card.status === 'tengo' ? 'active' : ''}" 
+                                data-status="tengo" title="Lo tengo">
+                            ✓
+                        </button>
+                        <button class="status-btn-horizontal ${card.status === 'cambiado' ? 'active' : ''}" 
+                                data-status="cambiado" title="Cambiado">
+                            ⇄
+                        </button>
+                        <input type="number" 
+                               class="duplicates-input" 
+                               value="${card.duplicatesCount}" 
+                               min="0" 
+                               data-id="${card.id}"
+                               title="Repetidos"
+                               placeholder="0">
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Event listeners para botones de estado
+        container.querySelectorAll('.status-btn-horizontal').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const cardId = btn.closest('.card-list-item-compact').dataset.id;
+                const status = btn.dataset.status;
+                await Controllers.updateCardStatus(cardId, 'status', status);
+            });
+        });
+        
+        // Event listeners para inputs de duplicados
+        container.querySelectorAll('.duplicates-input').forEach(input => {
+            input.addEventListener('change', async (e) => {
+                const cardId = e.target.dataset.id;
+                const value = parseInt(e.target.value) || 0;
+                await Controllers.updateCardStatus(cardId, 'duplicatesCount', value);
+            });
+        });
+        
+        // Doble click para editar
+        container.querySelectorAll('.card-list-item-compact').forEach(item => {
+            item.addEventListener('dblclick', () => {
+                Controllers.openEditCard(item.dataset.id);
+            });
+        });
+    },
+    
+    renderAlbumView(cards, container) {
+        container.className = 'cards-album-view';
+        
+        container.innerHTML = cards.map(card => {
+            return `
+                <div class="card-album-item status-${card.status}" data-id="${card.id}">
+                    ${card.duplicatesCount > 0 ? `<div class="album-duplicate-badge">x${card.duplicatesCount}</div>` : ''}
+                    
+                    <!-- Botón izquierdo: No tengo -->
+                    <button class="album-side-btn left ${card.status === 'falta' ? 'active' : ''}" 
+                            data-status="falta" title="No lo tengo">
+                        ✗
+                    </button>
+                    
+                    <div class="album-card-content" data-edit="${card.id}">
+                        <div class="album-card-number">${card.number}</div>
+                        <div>
+                            <div class="album-card-name">${card.playerName}</div>
+                            <div class="album-card-team">${card.team}</div>
+                        </div>
+                        
+                        <!-- Controles inferiores -->
+                        <div class="album-bottom-controls">
+                            <button class="album-mini-btn ${card.status === 'cambiado' ? 'active' : ''}" 
+                                    data-status="cambiado" title="Cambiado">
+                                ⇄
+                            </button>
+                            <input type="number" 
+                                   class="mini-duplicates-input" 
+                                   value="${card.duplicatesCount}" 
+                                   min="0" 
+                                   data-id="${card.id}"
+                                   title="Repetidos">
+                        </div>
+                    </div>
+                    
+                    <!-- Botón derecho: Tengo -->
+                    <button class="album-side-btn right ${card.status === 'tengo' ? 'active' : ''}" 
+                            data-status="tengo" title="Lo tengo">
+                        ✓
+                    </button>
+                </div>
+            `;
+        }).join('');
+        
+        // Event listeners para botones laterales
+        container.querySelectorAll('.album-side-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const cardId = btn.closest('.card-album-item').dataset.id;
+                const status = btn.dataset.status;
+                await Controllers.updateCardStatus(cardId, 'status', status);
+            });
+        });
+        
+        // Event listeners para botón cambiado
+        container.querySelectorAll('.album-mini-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const cardId = btn.closest('.card-album-item').dataset.id;
+                const status = btn.dataset.status;
+                const currentCard = STATE.cards.find(c => c.id == cardId);
+                const newStatus = currentCard.status === status ? 'falta' : status;
+                await Controllers.updateCardStatus(cardId, 'status', newStatus);
+            });
+        });
+        
+        // Event listeners para inputs de duplicados
+        container.querySelectorAll('.mini-duplicates-input').forEach(input => {
+            input.addEventListener('change', async (e) => {
+                e.stopPropagation();
+                const cardId = e.target.dataset.id;
+                const value = parseInt(e.target.value) || 0;
+                await Controllers.updateCardStatus(cardId, 'duplicatesCount', value);
+            });
+        });
+        
+        // Click en contenido para editar
+        container.querySelectorAll('.album-card-content').forEach(content => {
+            content.addEventListener('click', () => {
+                Controllers.openEditCard(content.dataset.edit);
+            });
+        });
+    },
+    
+    updateFilterOptions() {
+        const teams = [...new Set(STATE.cards.map(c => c.team))].sort();
+        const teamSelect = document.getElementById('filterTeam');
+        if (teamSelect) {
+            teamSelect.innerHTML = '<option value="">Todos los equipos</option>' + 
+                teams.map(t => `<option value="${t}">${t}</option>`).join('');
+            teamSelect.value = STATE.filters.team;
+        }
+        
+        const categorySelect = document.getElementById('filterCategory');
+        if (categorySelect) {
+            categorySelect.innerHTML = '<option value="">Todas las categorías</option>' + 
+                STATE.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            categorySelect.value = STATE.filters.category;
+        }
+        
+        const statusSelect = document.getElementById('filterStatus');
+        if (statusSelect) {
+            statusSelect.value = STATE.filters.status;
+        }
+    },
+    
+    stats() {
+        const total = STATE.cards.length;
+        const tengo = STATE.cards.filter(c => c.status === 'tengo').length;
+        const falta = STATE.cards.filter(c => c.status === 'falta').length;
+        const repetido = STATE.cards.filter(c => c.duplicatesCount > 0).length;
+        
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statTengo').textContent = tengo;
+        document.getElementById('statFalta').textContent = falta;
+        document.getElementById('statRepetido').textContent = repetido;
+    },
+    
+    categories() {
+        const select = document.getElementById('cardCategory');
+        
+        if (!STATE.categories.length) {
+            select.innerHTML = '<option value="">Crea una categoría primero</option>';
+            return;
+        }
+        
+        select.innerHTML = STATE.categories.map(cat => `
+            <option value="${cat.id}">${cat.name}${cat.isBasic ? ' (Básica)' : ''}</option>
+        `).join('');
+        
+        const list = document.getElementById('categoriesList');
+        list.innerHTML = STATE.categories.map(cat => `
+            <div class="category-item">
+                <div class="category-color" style="background: ${cat.color}"></div>
+                <div class="category-name">${cat.name} ${cat.isBasic ? '⭐' : ''}</div>
+                <button class="btn-icon" onclick="Controllers.openEditCategory(${cat.id})" title="Editar">✏️</button>
+                <button class="btn-icon" onclick="Controllers.deleteCategory(${cat.id})" title="Eliminar">🗑️</button>
+            </div>
+        `).join('');
+    },
+    
+    cardListModal(cards, title) {
+        document.getElementById('modalCardListTitle').textContent = title;
+        
+        // Guardar cards para reutilizar
+        this.currentModalCards = cards;
+        
+        // Renderizar vista de texto por defecto
+        this.renderTextView(cards);
+    },
+    
+    renderTextView(cards) {
+        const sortedCards = Utils.sortCards(cards);
+        const numbers = sortedCards.map(c => c.number).join(', ');
+        
+        document.getElementById('textListContent').textContent = numbers;
+        
+        // Actualizar UI
+        document.getElementById('viewTextContent').classList.add('active');
+        document.getElementById('viewGroupedContent').classList.remove('active');
+        document.getElementById('btnViewText').classList.add('active');
+        document.getElementById('btnViewGrouped').classList.remove('active');
+    },
+    
+    renderGroupedView(cards, filterCategory = '') {
+        const container = document.getElementById('groupedListContent');
+        
+        let filteredCards = cards;
+        if (filterCategory) {
+            filteredCards = cards.filter(c => c.categoryId == filterCategory);
+        }
+        
+        // Agrupar por categoría
+        const grouped = {};
+        
+        filteredCards.forEach(card => {
+            const category = STATE.categories.find(c => c.id == card.categoryId);
+            const catName = category ? category.name : 'Sin categoría';
+            const catId = category ? category.id : 'none';
+            const isBasic = category ? category.isBasic : false;
+            
+            if (!grouped[catId]) {
+                grouped[catId] = {
+                    name: catName,
+                    isBasic: isBasic,
+                    teams: {}
+                };
+            }
+            
+            // Si es básica, agrupar por equipos
+            if (isBasic) {
+                if (!grouped[catId].teams[card.team]) {
+                    grouped[catId].teams[card.team] = [];
+                }
+                grouped[catId].teams[card.team].push(card);
+            } else {
+                // Si no es básica, todos juntos
+                if (!grouped[catId].teams['all']) {
+                    grouped[catId].teams['all'] = [];
+                }
+                grouped[catId].teams['all'].push(card);
+            }
+        });
+        
+        let html = '';
+        
+        // Ordenar categorías: básicas primero
+        const sortedGroups = Object.entries(grouped).sort((a, b) => {
+            if (a[1].isBasic && !b[1].isBasic) return -1;
+            if (!a[1].isBasic && b[1].isBasic) return 1;
+            return a[1].name.localeCompare(b[1].name);
+        });
+        
+        sortedGroups.forEach(([catId, catData]) => {
+            html += `<div class="grouped-section">`;
+            html += `<h4>${catData.name} ${catData.isBasic ? '<span class="badge-basic">BÁSICA</span>' : ''}</h4>`;
+            
+            if (catData.isBasic) {
+                // Mostrar por equipos
+                Object.entries(catData.teams)
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .forEach(([team, teamCards]) => {
+                        const sortedCards = Utils.sortCards(teamCards);
+                        html += `<div style="margin-bottom: 1rem;">`;
+                        html += `<strong style="color: var(--text-secondary); font-size: 0.9rem; display: block; margin-bottom: 0.5rem;">${team}</strong>`;
+                        html += `<div class="numbers-list">`;
+                        sortedCards.forEach(card => {
+                            html += `<div class="number-item">${card.number}</div>`;
+                        });
+                        html += `</div></div>`;
+                    });
+            } else {
+                // Mostrar todos juntos
+                if (catData.teams['all']) {
+                    const sortedCards = Utils.sortCards(catData.teams['all']);
+                    html += `<div class="numbers-list">`;
+                    sortedCards.forEach(card => {
+                        html += `<div class="number-item">${card.number}</div>`;
+                    });
+                    html += `</div>`;
+                }
+            }
+            
+            html += `</div>`;
+        });
+        
+        if (!html) {
+            html = '<div class="empty-state"><p>No hay cromos en esta categoría</p></div>';
+        }
+        
+        container.innerHTML = html;
+        
+        // Actualizar UI
+        document.getElementById('viewTextContent').classList.remove('active');
+        document.getElementById('viewGroupedContent').classList.add('active');
+        document.getElementById('btnViewText').classList.remove('active');
+        document.getElementById('btnViewGrouped').classList.add('active');
+        
+        // Actualizar filtro de categorías
+        const categorySelect = document.getElementById('filterListCategory');
+        if (categorySelect) {
+            categorySelect.innerHTML = '<option value="">Todas las categorías</option>' + 
+                STATE.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            categorySelect.value = filterCategory;
+        }
+    }
+};
+
+// Continúa en siguiente mensaje...
