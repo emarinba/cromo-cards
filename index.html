@@ -137,6 +137,7 @@
                     <button id="btnViewFalta" class="btn btn-outline">📋 Faltan</button>
                     <button id="btnViewRepetido" class="btn btn-outline">📋 Repetidos</button>
                     <button id="btnToggleView" class="btn btn-secondary">🔄 Vista Álbum</button>
+                    <button id="btnToggleGrouping" class="btn btn-secondary">📁 Agrupar</button>
                     <button id="btnImport" class="btn btn-secondary">📥 Importar</button>
                     <button id="btnExport" class="btn btn-secondary">📤 Exportar</button>
                 </div>
@@ -176,6 +177,10 @@
                             <input type="text" id="albumName" required>
                         </div>
                         <div class="form-group">
+                            <label for="albumColor">Color del álbum</label>
+                            <input type="color" id="albumColor" value="#10B981">
+                        </div>
+                        <div class="form-group">
                             <label for="albumSeason">Temporada</label>
                             <input type="text" id="albumSeason" placeholder="Ej: 2023-2024">
                         </div>
@@ -202,7 +207,7 @@
                     <form id="formCard">
                         <div class="form-group">
                             <label for="cardNumber">Número</label>
-                            <input type="number" id="cardNumber" required>
+                            <input type="text" id="cardNumber" required>
                         </div>
                         <div class="form-group">
                             <label for="cardPlayer">Jugador *</label>
@@ -215,9 +220,6 @@
                         <div class="form-group">
                             <label for="cardCategory">Categoría *</label>
                             <select id="cardCategory" required></select>
-                            <label style="margin-top: 8px;">
-                                <input type="checkbox" id="cardIsBasic"> Es categoría básica (escudos/plantillas)
-                            </label>
                         </div>
                         <div class="form-group">
                             <label for="cardStatus">Estado</label>
@@ -232,6 +234,7 @@
                             <input type="number" id="cardDuplicates" min="0" value="0">
                         </div>
                         <div class="modal-actions">
+                            <button type="button" id="btnDeleteCard" class="btn btn-outline hidden" style="margin-right: auto;">Eliminar</button>
                             <button type="button" class="btn btn-secondary" data-close="modalCard">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
