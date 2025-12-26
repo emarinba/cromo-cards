@@ -328,6 +328,16 @@ const Controllers = {
                 if (STATE.groupingEnabled) btnGrouping.classList.add('active');
                 else btnGrouping.classList.remove('active');
             }
+            const btnCollapseAll = document.getElementById('btnCollapseAll');
+            const btnExpandAll = document.getElementById('btnExpandAll');
+
+            if (STATE.groupingEnabled) {
+                if (btnCollapseAll) btnCollapseAll.style.display = 'inline-flex';
+                if (btnExpandAll) btnExpandAll.style.display = 'inline-flex';
+            } else {
+                if (btnCollapseAll) btnCollapseAll.style.display = 'none';
+                if (btnExpandAll) btnExpandAll.style.display = 'none';
+            }
         } catch (error) {
             Utils.showToast('Error al cargar álbum: ' + error.message, 'error');
         } finally {
@@ -371,10 +381,28 @@ const Controllers = {
     toggleGrouping() {
         STATE.groupingEnabled = !STATE.groupingEnabled;
         localStorage.setItem('cromos_grouping_enabled', STATE.groupingEnabled);
+        
         const btn = document.getElementById('btnToggleGrouping');
         btn.textContent = STATE.groupingEnabled ? '📁 Agrupar' : '📋 Sin agrupar';
-        if (STATE.groupingEnabled) btn.classList.add('active');
-        else btn.classList.remove('active');
+        
+        if (STATE.groupingEnabled) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+        
+        // Mostrar/ocultar botones de colapsar/expandir
+        const btnCollapseAll = document.getElementById('btnCollapseAll');
+        const btnExpandAll = document.getElementById('btnExpandAll');
+        
+        if (STATE.groupingEnabled) {
+            if (btnCollapseAll) btnCollapseAll.style.display = 'inline-flex';
+            if (btnExpandAll) btnExpandAll.style.display = 'inline-flex';
+        } else {
+            if (btnCollapseAll) btnCollapseAll.style.display = 'none';
+            if (btnExpandAll) btnExpandAll.style.display = 'none';
+        }
+        
         Render.cards();
     },
     
@@ -434,7 +462,8 @@ const Controllers = {
             Utils.showToast('Debes crear una categoría primero', 'warning');
             return;
         }
-        const card = {
+        
+        const cardData = {
             albumId: STATE.currentAlbumId,
             number: document.getElementById('cardNumber').value,
             playerName: document.getElementById('cardPlayer').value,
@@ -443,19 +472,48 @@ const Controllers = {
             status: document.getElementById('cardStatus').value,
             duplicatesCount: parseInt(document.getElementById('cardDuplicates').value) || 0
         };
+        
+        // CERRAR MODAL INMEDIATAMENTE (optimistic UI)
+        Utils.closeModal('modalCard');
+        
         try {
-            Utils.showLoader();
             if (STATE.currentCardId) {
-                card.id = STATE.currentCardId;
-                await API.updateCard(card);
-                Utils.showToast('Cromo actualizado');
+                // ACTUALIZACIÓN: cambio instantáneo en UI
+                const card = STATE.cards.find(c => c.id == STATE.currentCardId);
+                const previousData = {...card}; // Backup para rollback
+                
+                // Actualizar UI inmediatamente
+                Object.assign(card, cardData);
+                Render.cards();
+                Render.stats();
+                
+                // Guardar en backend
+                cardData.id = STATE.currentCardId;
+                await API.updateCard(cardData);
+                Utils.showToast('Cromo actualizado', 'success');
+                
             } else {
-                await API.createCard(card);
-                Utils.showToast('Cromo creado');
+                // CREACIÓN: mostrar en UI inmediatamente
+                const tempId = 'temp-' + Date.now();
+                const newCard = {...cardData, id: tempId};
+                STATE.cards.push(newCard);
+                
+                Render.cards();
+                Render.stats();
+                
+                // Guardar en backend
+                const savedCard = await API.createCard(cardData);
+                
+                // Reemplazar temp ID con ID real
+                const index = STATE.cards.findIndex(c => c.id === tempId);
+                if (index !== -1) STATE.cards[index] = savedCard;
+                
+                Utils.showToast('Cromo creado', 'success');
             }
-            Utils.closeModal('modalCard');
+            
             STATE.currentCardId = null;
-            await this.openAlbum(STATE.currentAlbumId);
+            
+            // Restaurar scroll
             const savedScroll = localStorage.getItem('cromos_scroll_position');
             if (savedScroll) {
                 setTimeout(() => {
@@ -463,10 +521,11 @@ const Controllers = {
                     localStorage.removeItem('cromos_scroll_position');
                 }, 100);
             }
+            
         } catch (error) {
-            Utils.showToast('Error: ' + error.message, 'error');
-        } finally {
-            Utils.hideLoader();
+            // ROLLBACK en caso de error
+            Utils.showToast('Error al guardar. Recargando...', 'error');
+            await this.openAlbum(STATE.currentAlbumId);
         }
     },
     
@@ -764,6 +823,10 @@ const Controllers = {
         if (btnToggleView) btnToggleView.addEventListener('click', () => this.toggleView());
         const btnToggleGrouping = document.getElementById('btnToggleGrouping');
         if (btnToggleGrouping) btnToggleGrouping.addEventListener('click', () => this.toggleGrouping());
+        const btnCollapseAll = document.getElementById('btnCollapseAll');
+        if (btnCollapseAll) btnCollapseAll.addEventListener('click', () => this.collapseAllGroups());
+        const btnExpandAll = document.getElementById('btnExpandAll');
+        if (btnExpandAll) btnExpandAll.addEventListener('click', () => this.expandAllGroups());
         const btnManageCategories = document.getElementById('btnManageCategories');
         if (btnManageCategories) btnManageCategories.addEventListener('click', () => Utils.openModal('modalCategories'));
         const btnImport = document.getElementById('btnImport');
@@ -794,6 +857,34 @@ const Controllers = {
                 if (e.target === modal) modal.classList.remove('active');
             });
         });
+    },
+
+    collapseAllGroups() {
+        // Obtener todos los grupos visibles
+        const allGroups = [];
+        const grouped = groupCards(STATE.cards, STATE.categories);
+        
+        Object.keys(grouped.basic).forEach(team => {
+            allGroups.push(`basic-${team.replace(/\s/g, '-')}`);
+        });
+        
+        Object.keys(grouped.special).forEach(catName => {
+            allGroups.push(`special-${catName.replace(/\s/g, '-')}`);
+        });
+        
+        // Colapsar todos
+        if (!STATE.collapsedGroups) STATE.collapsedGroups = {};
+        allGroups.forEach(groupId => {
+            STATE.collapsedGroups[groupId] = true;
+        });
+        
+        Render.cards();
+    },
+
+    expandAllGroups() {
+        // Limpiar todos los colapsados
+        STATE.collapsedGroups = {};
+        Render.cards();
     }
 };
 
