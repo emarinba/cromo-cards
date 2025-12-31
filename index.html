@@ -367,8 +367,24 @@
     </div>
 
     <div id="toast" class="toast"></div>
+        
+    <!-- NUEVO: Cargar Supabase SDK desde CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script src="config.js"></script>
+     <!-- NUEVO: Cliente Supabase -->
+    <script src="supabase-client.js"></script>
+    
+    <!-- Inicializar Supabase -->
+   <script>
+        try {
+            initSupabase();
+            console.log('✅ Supabase inicializado correctamente');
+        } catch (error) {
+            console.error('❌ Error inicializando Supabase:', error);
+        }
+    </script>
+        
+    <!-- Tu app -->
     <script src="app.js"></script>
 </body>
 </html>

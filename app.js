@@ -104,66 +104,112 @@ const Utils = {
 };
 
 const API = {
-    async request(path, action = 'list', data = null) {
-        if (!APP_CONFIG.API_URL) throw new Error('API URL no configurada');
-        let url = `${APP_CONFIG.API_URL}?path=${path}&action=${action}`;
-        if (STATE.user && path !== 'users') url += `&userId=${STATE.user.id}`;
-        if (STATE.currentAlbumId && path === 'categories') url += `&albumId=${STATE.currentAlbumId}`;
-        if (data) {
-            url += `&data=${encodeURIComponent(JSON.stringify(data))}`;
-            const simpleParams = ['id', 'albumId'];
-            simpleParams.forEach(param => {
-                if (data[param] !== undefined) url += `&${param}=${encodeURIComponent(data[param])}`;
-            });
-        }
-        try {
-            const response = await fetch(url, { method: 'GET' });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.error || 'Error en la petición');
-            return result.data;
-        } catch (error) {
-            console.error('❌ API Error:', error);
-            throw error;
-        }
+    // ============================================
+    // USERS - Autenticación
+    // ============================================
+    
+    async register(name, email, password) {
+        return await SupabaseDB.registerUser(name, email, password);
     },
-    register(name, email, password) { return this.request('users', 'register', { name, email, password }); },
-    login(email, password) { return this.request('users', 'login', { email, password }); },
-    getAlbums() { return this.request('albums', 'list'); },
-    createAlbum(album) { album.userId = STATE.user.id; return this.request('albums', 'create', album); },
-    updateAlbum(album) { return this.request('albums', 'update', album); },
-    deleteAlbum(id) { return this.request('albums', 'delete', { id }); },
-    getCards(albumId) { return this.request('cards', 'list', { albumId }); },
-    createCard(card) { return this.request('cards', 'create', card); },
-    updateCard(card) { return this.request('cards', 'update', card); },
-    updateCardStatus(id, field, value) { return this.request('cards', 'updateStatus', { id, field, value }); },
-    deleteCard(id) { return this.request('cards', 'delete', { id }); },
-    getCategories(albumId) { return this.request('categories', 'list', { albumId }); },
-    createCategory(category) { category.albumId = STATE.currentAlbumId; return this.request('categories', 'create', category); },
-    updateCategory(category) { return this.request('categories', 'update', category); },
-    deleteCategory(id) { return this.request('categories', 'delete', { id }); },
-    importCards(albumId, cards) { return this.request('import', 'cards', { albumId, cards }); }
+    
+    async login(email, password) {
+        return await SupabaseDB.loginUser(email, password);
+    },
+    
+    async logout() {
+        return await SupabaseDB.logout();
+    },
+    
+    // ============================================
+    // ALBUMS
+    // ============================================
+    
+    async getAlbums() {
+        return await SupabaseDB.getAlbums();
+    },
+    
+    async createAlbum(album) {
+        return await SupabaseDB.createAlbum(album);
+    },
+    
+    async updateAlbum(album) {
+        return await SupabaseDB.updateAlbum(album.id, album);
+    },
+    
+    async deleteAlbum(id) {
+        return await SupabaseDB.deleteAlbum(id);
+    },
+    
+    // ============================================
+    // CATEGORIES
+    // ============================================
+    
+    async getCategories(albumId) {
+        return await SupabaseDB.getCategories(albumId);
+    },
+    
+    async createCategory(category) {
+        return await SupabaseDB.createCategory(STATE.currentAlbumId, category);
+    },
+    
+    async updateCategory(category) {
+        return await SupabaseDB.updateCategory(category.id, category);
+    },
+    
+    async deleteCategory(id) {
+        return await SupabaseDB.deleteCategory(id);
+    },
+    
+    // ============================================
+    // CARDS
+    // ============================================
+    
+    async getCards(albumId) {
+        return await SupabaseDB.getCards(albumId);
+    },
+    
+    async createCard(card) {
+        return await SupabaseDB.createCard(card);
+    },
+    
+    async updateCard(card) {
+        return await SupabaseDB.updateCard(card.id, card);
+    },
+    
+    async updateCardStatus(id, field, value) {
+        return await SupabaseDB.updateCardStatus(id, field, value);
+    },
+    
+    async deleteCard(id) {
+        return await SupabaseDB.deleteCard(id);
+    },
+    
+    async importCards(albumId, cards) {
+        return await SupabaseDB.importCards(albumId, cards);
+    }
 };
 
-const Session = {
-    save(user) { localStorage.setItem('cromos_session', JSON.stringify({user: user, timestamp: Date.now()})); },
-    load() {
-        const session = localStorage.getItem('cromos_session');
-        if (!session) return null;
-        try {
-            const data = JSON.parse(session);
-            if (Date.now() - data.timestamp > STATE.sessionExpiry) {
-                this.clear();
-                return null;
-            }
-            return data.user;
-        } catch (e) { return null; }
+const Session = {   
+    
+    save(user) {
+        // No hacer nada, Supabase lo gestiona
     },
-    clear() { localStorage.removeItem('cromos_session'); }
+    
+    async load() {
+        // Obtener usuario actual de Supabase
+        return await SupabaseDB.getCurrentUser();
+    },
+    
+    clear() {
+        // El logout ya limpia la sesión
+    }
 };
 
 const Auth = {
     isLoginMode: true,
+    
     toggleMode() {
+        // Sin cambios
         this.isLoginMode = !this.isLoginMode;
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
@@ -178,27 +224,27 @@ const Auth = {
             toggleBtn.textContent = '¿Ya tienes cuenta? Inicia sesión';
         }
     },
+    
     async handleLogin(e) {
         e.preventDefault();
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
+        
         if (!email || !password) {
             Utils.showToast('Completa todos los campos', 'warning');
             return;
         }
+        
         Utils.showLoader();
         try {
             const user = await API.login(email, password);
             STATE.user = user;
-            Session.save(user);
             this.showApp();
             await Controllers.init();
             Utils.showToast(`¡Bienvenido ${user.name}! 🎉`, 'success');
         } catch (error) {
-            if (error.message.includes('USER_NOT_FOUND')) {
-                Utils.showToast('Usuario no encontrado', 'error');
-            } else if (error.message.includes('INVALID_PASSWORD')) {
-                Utils.showToast('Contraseña incorrecta', 'error');
+            if (error.message.includes('INVALID_PASSWORD')) {
+                Utils.showToast('Email o contraseña incorrectos', 'error');
             } else {
                 Utils.showToast('Error al iniciar sesión: ' + error.message, 'error');
             }
@@ -206,32 +252,48 @@ const Auth = {
             Utils.hideLoader();
         }
     },
+    
     async handleRegister(e) {
         e.preventDefault();
         const name = document.getElementById('registerName').value.trim();
         const email = document.getElementById('registerEmail').value.trim();
         const password = document.getElementById('registerPassword').value;
         const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+        
         if (!name || !email || !password) {
             Utils.showToast('Completa todos los campos', 'warning');
             return;
         }
+        
         if (password.length < 6) {
             Utils.showToast('La contraseña debe tener al menos 6 caracteres', 'warning');
             return;
         }
+        
         if (password !== passwordConfirm) {
             Utils.showToast('Las contraseñas no coinciden', 'warning');
             return;
         }
+        
         Utils.showLoader();
         try {
             const user = await API.register(name, email, password);
             STATE.user = user;
-            Session.save(user);
-            this.showApp();
-            await Controllers.init();
-            Utils.showToast(`¡Cuenta creada! Bienvenido ${user.name} 🎉`, 'success');
+            
+            // Supabase puede requerir verificación de email
+            Utils.showToast('¡Cuenta creada! Revisa tu email para confirmar 📧', 'success');
+            
+            // Intentar login automático
+            try {
+                const loggedUser = await API.login(email, password);
+                STATE.user = loggedUser;
+                this.showApp();
+                await Controllers.init();
+            } catch {
+                // Si falla (email no confirmado), mostrar login
+                Utils.showToast('Por favor inicia sesión después de confirmar tu email', 'info');
+            }
+            
         } catch (error) {
             if (error.message.includes('EMAIL_EXISTS')) {
                 Utils.showToast('Este email ya está registrado', 'error');
@@ -242,20 +304,21 @@ const Auth = {
             Utils.hideLoader();
         }
     },
+    
     showApp() {
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userNameDisplay').textContent = STATE.user.name;
         Utils.generateAvatar(STATE.user.name);
     },
-    logout() {
-        Session.clear();
+    
+    async logout() {
+        await API.logout();
         STATE.user = null;
         STATE.albums = [];
         STATE.cards = [];
         STATE.categories = [];
         STATE.currentAlbumId = null;
-        STATE.currentCardId = null;
         document.getElementById('mainApp').classList.add('hidden');
         document.getElementById('loginScreen').classList.add('active');
         document.getElementById('loginForm').reset();
@@ -454,7 +517,7 @@ const Controllers = {
             Utils.hideLoader();
         }
     },
-    
+
     async saveCard(e) {
         e.preventDefault();
         const categoryId = document.getElementById('cardCategory').value;
@@ -466,9 +529,9 @@ const Controllers = {
         const cardData = {
             albumId: STATE.currentAlbumId,
             number: document.getElementById('cardNumber').value,
-            playerName: document.getElementById('cardPlayer').value,
+            playerName: document.getElementById('cardPlayer').value,  // ← Asegúrate que sea 'playerName'
             team: document.getElementById('cardTeam').value,
-            categoryId: parseInt(categoryId),
+            categoryId: categoryId,  // NO parseInt aquí, ya es string UUID
             status: document.getElementById('cardStatus').value,
             duplicatesCount: parseInt(document.getElementById('cardDuplicates').value) || 0
         };
@@ -895,13 +958,18 @@ const Controllers = {
 
 window.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 APP INICIADA');
+    
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const toggleBtn = document.getElementById('toggleAuthMode');
+    
     if (loginForm) loginForm.addEventListener('submit', (e) => Auth.handleLogin(e));
     if (registerForm) registerForm.addEventListener('submit', (e) => Auth.handleRegister(e));
     if (toggleBtn) toggleBtn.addEventListener('click', () => Auth.toggleMode());
-    const savedUser = Session.load();
+    
+    // NUEVO: Cargar sesión de Supabase
+    const savedUser = await Session.load();
+    
     if (savedUser) {
         console.log('✅ Sesión encontrada');
         STATE.user = savedUser;
